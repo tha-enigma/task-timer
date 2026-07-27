@@ -14,7 +14,7 @@
     .panel { background: #1e293b; color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
     .form-grid { display: grid; grid-template-columns: 80px 1fr 90px 320px; gap: 12px; align-items: center; }
     
-    input[type="text"], select, textarea {
+    input[type="text"], input[type="number"], select, textarea {
       width: 100%;
       padding: 10px 12px;
       border-radius: 8px;
@@ -66,6 +66,34 @@
     .table-card { background: white; padding: 16px; border-radius: 10px; border: 1px solid #cbd5e1; }
     
     .entry-item { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(15, 23, 42, 0.7);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-content {
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      max-width: 600px;
+      width: 90%;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);
+    }
+    .code-block {
+      background: #0f172a;
+      color: #38bdf8;
+      padding: 12px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 13px;
+      margin: 8px 0 16px 0;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
@@ -75,7 +103,10 @@
       <h1>Cross-Platform Time Tracker (Web Edition)</h1>
       <small style="color: #94a3b8;">Calm, reliable local time tracking</small>
     </div>
-    <button onclick="clearForm()" class="secondary" style="font-size: 12px; padding: 6px 12px;">Clear Inputs</button>
+    <div style="display: flex; gap: 8px;">
+      <button onclick="toggleGitModal()" style="background: #334155; font-size: 12px; padding: 6px 12px;">Git Commands</button>
+      <button onclick="clearForm()" class="secondary" style="font-size: 12px; padding: 6px 12px;">Clear Inputs</button>
+    </div>
   </header>
 
   <!-- Input Form -->
@@ -107,12 +138,17 @@
         <span id="statusBadge" class="status-badge">Ready</span>
       </div>
 
-      <!-- Action Buttons -->
-      <div style="grid-column: span 2; display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;">
+      <!-- Action Buttons & Manual Entry Inputs -->
+      <div style="grid-column: span 2; display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px;">
         <button id="startBtn" onclick="startTimer()">Start</button>
         <button id="pauseBtn" onclick="togglePause()" class="warning" disabled>Pause</button>
         <button id="stopBtn" onclick="stopTimer()" class="secondary" disabled>Stop & Save</button>
-        <button onclick="logManualEntry()" class="secondary">+ Log Time</button>
+        
+        <span style="border-left: 1px solid #475569; height: 24px; margin: 0 4px;"></span>
+        
+        <input type="number" id="manualHours" placeholder="Hrs" min="0" style="width: 65px; padding: 8px;">
+        <input type="number" id="manualMins" placeholder="Mins" min="0" max="59" style="width: 70px; padding: 8px;">
+        <button onclick="logManualEntry()" class="secondary">+ Log Manual</button>
       </div>
     </div>
   </div>
@@ -139,12 +175,40 @@
     </div>
   </div>
 
+  <!-- Git Commands Modal -->
+  <div id="gitModal" class="modal-overlay">
+    <div class="modal-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h2 style="font-size: 1.2rem;">Git Commands Cheat Sheet</h2>
+        <button onclick="toggleGitModal()" class="danger" style="padding: 4px 8px; font-size: 12px;">Close</button>
+      </div>
+      
+      <p style="font-size: 13px; color: #475569; margin-bottom: 4px;"><strong>1. Push for the first time:</strong></p>
+      <div class="code-block">git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/your-username/task-timer.git
+git push -u origin main</div>
+
+      <p style="font-size: 13px; color: #475569; margin-bottom: 4px;"><strong>2. Push future updates:</strong></p>
+      <div class="code-block">git add .
+git commit -m "Updated task timer features"
+git push</div>
+    </div>
+  </div>
+
   <script>
     let entries = JSON.parse(localStorage.getItem('time_entries') || '[]');
     let timerInterval = null;
-    let accumulatedTime = 0; // Total milliseconds tracked before pause
+    let accumulatedTime = 0;
     let startTime = null;
     let isPaused = false;
+
+    function toggleGitModal() {
+      const modal = document.getElementById('gitModal');
+      modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
+    }
 
     function saveEntries() {
       localStorage.setItem('time_entries', JSON.stringify(entries));
@@ -190,16 +254,14 @@
       const task = document.getElementById('taskInput').value.trim();
 
       if (!isPaused) {
-        // Pausing the timer
         accumulatedTime += (new Date() - startTime);
         isPaused = true;
         
         pauseBtn.textContent = 'Resume';
-        pauseBtn.className = 'button'; // Blue style for resume
+        pauseBtn.className = 'button';
         badge.textContent = 'Paused: ' + task;
         badge.className = 'status-badge paused';
       } else {
-        // Resuming the timer
         startTime = new Date();
         isPaused = false;
 
@@ -215,7 +277,6 @@
 
       clearInterval(timerInterval);
       
-      // Calculate final total time
       let totalMilliseconds = accumulatedTime;
       if (!isPaused && startTime) {
         totalMilliseconds += (new Date() - startTime);
@@ -240,7 +301,6 @@
         saveEntries();
       }
 
-      // Reset state
       startTime = null;
       accumulatedTime = 0;
       isPaused = false;
@@ -262,28 +322,36 @@
     function clearForm() {
       document.getElementById('taskInput').value = '';
       document.getElementById('notesInput').value = '';
+      document.getElementById('manualHours').value = '';
+      document.getElementById('manualMins').value = '';
       document.getElementById('categorySelect').selectedIndex = 0;
     }
 
     function logManualEntry() {
-      const task = document.getElementById('taskInput').value.trim() || 'Manual Entry';
-      const mins = prompt('Enter duration in minutes:', '60');
-      if (!mins || isNaN(mins)) return;
+      const task = document.getElementById('taskInput').value.trim();
+      if (!task) return alert('Please enter a Task Name first!');
+
+      const hrs = parseInt(document.getElementById('manualHours').value) || 0;
+      const mins = parseInt(document.getElementById('manualMins').value) || 0;
+
+      const totalMinutes = (hrs * 60) + mins;
+      if (totalMinutes <= 0) return alert('Please enter hours or minutes worked.');
 
       const now = new Date();
-      const start = new Date(now - mins * 60000);
+      const start = new Date(now - totalMinutes * 60000);
 
       entries.unshift({
         id: Date.now(),
-        task,
+        task: task,
         category: document.getElementById('categorySelect').value,
         notes: document.getElementById('notesInput').value.trim(),
         startTime: start.toISOString(),
         endTime: now.toISOString(),
-        durationMinutes: parseInt(mins)
+        durationMinutes: totalMinutes
       });
 
       saveEntries();
+      clearForm();
     }
 
     function deleteEntry(id) {
