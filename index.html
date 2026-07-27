@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cross-Platform Time Tracker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: #f1f5f9; color: #0f172a; padding: 20px; }
+    
+    header { background: #0f172a; color: white; padding: 16px 24px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+    header h1 { font-size: 1.4rem; }
+    
+    .panel { background: #1e293b; color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+    .form-grid { display: grid; grid-template-columns: 80px 1fr 90px 320px; gap: 12px; align-items: center; }
+    
+    input[type="text"], select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 2px solid #2563eb;
+      background: #ffffff !important;
+      color: #0f172a !important;
+      font-size: 14px;
+      outline: none;
+    }
+
+    textarea { resize: vertical; height: 60px; grid-column: span 3; }
+    
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+    button:hover { background: #1d4ed8; }
+    button.secondary { background: #475569; }
+    button.warning { background: #d97706; }
+    button.warning:hover { background: #b45309; }
+    button.danger { background: #dc2626; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .timer-display { font-size: 2rem; font-weight: bold; }
+    
+    .status-badge {
+      font-size: 14px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: #334155;
+      color: #93c5fd;
+    }
+    .status-badge.running { background: #166534; color: #86efac; }
+    .status-badge.paused { background: #854d0e; color: #fef08a; }
+
+    .summaries { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    .summary-card { padding: 16px; border-radius: 10px; font-weight: 600; }
+    .summary-card.today { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+    .summary-card.week { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+
+    .tables { display: grid; grid-template-columns: 1.8fr 1.2fr; gap: 12px; }
+    .table-card { background: white; padding: 16px; border-radius: 10px; border: 1px solid #cbd5e1; }
+    
+    .entry-item { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>Cross-Platform Time Tracker (Web Edition)</h1>
+      <small style="color: #94a3b8;">Calm, reliable local time tracking</small>
+    </div>
+    <button onclick="clearForm()" class="secondary" style="font-size: 12px; padding: 6px 12px;">Clear Inputs</button>
+  </header>
+
+  <!-- Input Form -->
+  <div class="panel">
+    <div class="form-grid">
+      <label>Task</label>
+      <input type="text" id="taskInput" placeholder="e.g., SuccessFactors Implementation, Ticket Review">
+      
+      <label style="text-align: right;">Category</label>
+      <select id="categorySelect">
+        <option>General</option>
+        <option>Project</option>
+        <option>Meeting</option>
+        <option>Technical Work</option>
+        <option>Support</option>
+        <option>Documentation</option>
+        <option>00 | AS-AS - (Projects)</option>
+        <option>01 | AS-AS - Administrative</option>
+        <option>02 | AS-AS - Training</option>
+        <option>03 | AS-AS - Operations</option>
+      </select>
+
+      <label>Notes</label>
+      <textarea id="notesInput" placeholder="Optional details or notes"></textarea>
+
+      <!-- Timer & Status Badge -->
+      <div style="grid-column: span 2; display: flex; align-items: center; gap: 16px; margin-top: 8px;">
+        <span class="timer-display" id="timerDisplay">00:00:00</span>
+        <span id="statusBadge" class="status-badge">Ready</span>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="grid-column: span 2; display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;">
+        <button id="startBtn" onclick="startTimer()">Start</button>
+        <button id="pauseBtn" onclick="togglePause()" class="warning" disabled>Pause</button>
+        <button id="stopBtn" onclick="stopTimer()" class="secondary" disabled>Stop & Save</button>
+        <button onclick="logManualEntry()" class="secondary">+ Log Time</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summaries -->
+  <div class="summaries">
+    <div class="summary-card today" id="todaySummary">Today: 0.00h</div>
+    <div class="summary-card week" id="weekSummary">This Week: 0.00h</div>
+  </div>
+
+  <!-- Log & Reports -->
+  <div class="tables">
+    <div class="table-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3>Time Entries</h3>
+        <button onclick="exportCSV()" class="secondary">Export Replicon CSV</button>
+      </div>
+      <div id="entriesList"></div>
+    </div>
+
+    <div class="table-card">
+      <h3>Weekly Report by Task</h3>
+      <div id="weeklyReportList" style="margin-top: 12px;"></div>
+    </div>
+  </div>
+
+  <script>
+    let entries = JSON.parse(localStorage.getItem('time_entries') || '[]');
+    let timerInterval = null;
+    let accumulatedTime = 0; // Total milliseconds tracked before pause
+    let startTime = null;
+    let isPaused = false;
+
+    function saveEntries() {
+      localStorage.setItem('time_entries', JSON.stringify(entries));
+      render();
+    }
+
+    function updateTimerUI(milliseconds) {
+      const seconds = Math.floor((milliseconds / 1000) % 60);
+      const minutes = Math.floor((milliseconds / (1000 * 60)) % 60);
+      const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+
+      const pad = (num) => String(num).padStart(2, '0');
+      document.getElementById('timerDisplay').textContent = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    }
+
+    function startTimer() {
+      const task = document.getElementById('taskInput').value.trim();
+      if (!task) return alert('Enter a task name first!');
+      
+      startTime = new Date();
+      accumulatedTime = 0;
+      isPaused = false;
+
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('pauseBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = false;
+      
+      const badge = document.getElementById('statusBadge');
+      badge.textContent = 'Running: ' + task;
+      badge.className = 'status-badge running';
+
+      timerInterval = setInterval(() => {
+        if (!isPaused) {
+          const currentElapsed = accumulatedTime + (new Date() - startTime);
+          updateTimerUI(currentElapsed);
+        }
+      }, 1000);
+    }
+
+    function togglePause() {
+      const badge = document.getElementById('statusBadge');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const task = document.getElementById('taskInput').value.trim();
+
+      if (!isPaused) {
+        // Pausing the timer
+        accumulatedTime += (new Date() - startTime);
+        isPaused = true;
+        
+        pauseBtn.textContent = 'Resume';
+        pauseBtn.className = 'button'; // Blue style for resume
+        badge.textContent = 'Paused: ' + task;
+        badge.className = 'status-badge paused';
+      } else {
+        // Resuming the timer
+        startTime = new Date();
+        isPaused = false;
+
+        pauseBtn.textContent = 'Pause';
+        pauseBtn.className = 'warning';
+        badge.textContent = 'Running: ' + task;
+        badge.className = 'status-badge running';
+      }
+    }
+
+    function stopTimer() {
+      if (!startTime && accumulatedTime === 0) return;
+
+      clearInterval(timerInterval);
+      
+      // Calculate final total time
+      let totalMilliseconds = accumulatedTime;
+      if (!isPaused && startTime) {
+        totalMilliseconds += (new Date() - startTime);
+      }
+
+      const totalMinutes = Math.round(totalMilliseconds / 60000);
+      const now = new Date();
+      const calculatedStartTime = new Date(now.getTime() - totalMilliseconds);
+
+      if (totalMinutes > 0) {
+        const entry = {
+          id: Date.now(),
+          task: document.getElementById('taskInput').value.trim(),
+          category: document.getElementById('categorySelect').value,
+          notes: document.getElementById('notesInput').value.trim(),
+          startTime: calculatedStartTime.toISOString(),
+          endTime: now.toISOString(),
+          durationMinutes: totalMinutes
+        };
+
+        entries.unshift(entry);
+        saveEntries();
+      }
+
+      // Reset state
+      startTime = null;
+      accumulatedTime = 0;
+      isPaused = false;
+
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('pauseBtn').disabled = true;
+      document.getElementById('pauseBtn').textContent = 'Pause';
+      document.getElementById('pauseBtn').className = 'warning';
+      document.getElementById('stopBtn').disabled = true;
+      document.getElementById('timerDisplay').textContent = '00:00:00';
+
+      const badge = document.getElementById('statusBadge');
+      badge.textContent = 'Stopped & Saved';
+      badge.className = 'status-badge';
+
+      clearForm();
+    }
+
+    function clearForm() {
+      document.getElementById('taskInput').value = '';
+      document.getElementById('notesInput').value = '';
+      document.getElementById('categorySelect').selectedIndex = 0;
+    }
+
+    function logManualEntry() {
+      const task = document.getElementById('taskInput').value.trim() || 'Manual Entry';
+      const mins = prompt('Enter duration in minutes:', '60');
+      if (!mins || isNaN(mins)) return;
+
+      const now = new Date();
+      const start = new Date(now - mins * 60000);
+
+      entries.unshift({
+        id: Date.now(),
+        task,
+        category: document.getElementById('categorySelect').value,
+        notes: document.getElementById('notesInput').value.trim(),
+        startTime: start.toISOString(),
+        endTime: now.toISOString(),
+        durationMinutes: parseInt(mins)
+      });
+
+      saveEntries();
+    }
+
+    function deleteEntry(id) {
+      if (confirm('Delete this entry?')) {
+        entries = entries.filter(e => e.id !== id);
+        saveEntries();
+      }
+    }
+
+    function exportCSV() {
+      if (entries.length === 0) return alert('No time entries to export yet!');
+      
+      let csv = "Date,Task,Category,Hours,Comments\n";
+      
+      entries.forEach(e => {
+        const dateObj = new Date(e.startTime);
+        const formattedDate = dateObj.toISOString().split('T')[0];
+        const durationHours = (e.durationMinutes / 60).toFixed(2);
+        
+        const cleanTask = e.task.replace(/"/g, '""');
+        const cleanNotes = (e.notes || '').replace(/"/g, '""');
+        
+        csv += `"${formattedDate}","${cleanTask}","${e.category}",${durationHours},"${cleanNotes}"\n`;
+      });
+      
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Replicon_TimeExport_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function render() {
+      const list = document.getElementById('entriesList');
+      list.innerHTML = '';
+      let totalMins = 0;
+      const taskTotals = {};
+
+      entries.forEach(e => {
+        totalMins += e.durationMinutes;
+        
+        if (!taskTotals[e.task]) {
+          taskTotals[e.task] = { minutes: 0, count: 0 };
+        }
+        taskTotals[e.task].minutes += e.durationMinutes;
+        taskTotals[e.task].count += 1;
+
+        const div = document.createElement('div');
+        div.className = 'entry-item';
+        div.innerHTML = `
+          <div>
+            <strong>${e.task}</strong> <small>(${e.category})</small><br>
+            <span style="color: #2563eb; font-weight: 600;">${(e.durationMinutes / 60).toFixed(2)} hrs</span>
+            ${e.notes ? ` - <small style="color: #64748b;">${e.notes}</small>` : ''}
+          </div>
+          <button onclick="deleteEntry(${e.id})" class="danger" style="padding: 4px 8px; font-size: 12px;">Delete</button>
+        `;
+        list.appendChild(div);
+      });
+
+      const reportList = document.getElementById('weeklyReportList');
+      reportList.innerHTML = '';
+      Object.keys(taskTotals).forEach(taskName => {
+        const item = taskTotals[taskName];
+        const div = document.createElement('div');
+        div.className = 'entry-item';
+        div.innerHTML = `
+          <div>
+            <strong>${taskName}</strong><br>
+            <span style="color: #15803d; font-weight: 600;">${(item.minutes / 60).toFixed(2)} total hrs</span>
+            <small style="color: #64748b;">(${item.count} entries)</small>
+          </div>
+        `;
+        reportList.appendChild(div);
+      });
+
+      document.getElementById('todaySummary').textContent = `Today: ${(totalMins / 60).toFixed(2)}h`;
+      document.getElementById('weekSummary').textContent = `This Week: ${(totalMins / 60).toFixed(2)}h`;
+    }
+
+    render();
+  </script>
+</body>
+</html>

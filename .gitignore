@@ -1,0 +1,8 @@
+node_modules/
+bin/
+obj/
+*.app
+*.exe
+TimeTracker-darwin-x64/
+TimeTracker-win32-x64/
+.DS_Store
